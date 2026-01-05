@@ -34,12 +34,12 @@ export function getOrCreateParticipantId(): string {
   if (typeof window === "undefined") {
     return generateUUID();
   }
-  
+
   const stored = localStorage.getItem("dp_participant_id");
   if (stored) {
     return stored;
   }
-  
+
   const participantId = generateUUID();
   localStorage.setItem("dp_participant_id", participantId);
   return participantId;
@@ -64,3 +64,13 @@ export function setHostId(roomId: string, hostId: string): void {
   }
   localStorage.setItem(`dp_host_id_${roomId}`, hostId);
 }
+
+/**
+ * 在席管理の定数
+ */
+export const PRESENCE_CONFIG = {
+  // heartbeat の送信間隔（ミリ秒）
+  HEARTBEAT_INTERVAL_MS: 12000, // 12秒
+  // オフライン判定の閾値（ミリ秒）
+  OFFLINE_THRESHOLD_MS: 30000, // 30秒
+} as const;

@@ -67,6 +67,8 @@ export default function Home() {
       await setDoc(doc(db, "rooms", newRoomId, "participants", hostId), {
         name: userName,
         selectedCard: null,
+        online: true,
+        lastSeenAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       console.log("[createRoom] participant doc created");

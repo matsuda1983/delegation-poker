@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { db } from "../../../src/lib/firebase";
 import {
@@ -13,13 +13,20 @@ import {
   getDoc,
   getDocs,
   writeBatch,
+  Timestamp,
 } from "firebase/firestore";
-import { getOrCreateParticipantId, getHostId } from "../../../src/lib/utils";
+import {
+  getOrCreateParticipantId,
+  getHostId,
+  PRESENCE_CONFIG,
+} from "../../../src/lib/utils";
 
 interface Participant {
   participantId: string;
   name: string;
   selectedCard: number | null;
+  online: boolean;
+  lastSeenAt: Timestamp | null;
 }
 
 interface RoomData {
@@ -42,10 +49,40 @@ export default function RoomPage() {
   const [participantId] = useState(() => getOrCreateParticipantId());
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showOffline, setShowOffline] = useState(false); // オフライン参加者も表示するか
+
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const participantRefRef = useRef(
+    doc(db, "rooms", roomId, "participants", participantId)
+  );
 
   const isHost = roomData ? getHostId(roomId) === roomData.hostId : false;
   const isVoting = roomData?.status === "voting";
   const isRevealed = roomData?.status === "revealed";
+
+  // オンライン状態を更新する関数
+  const updateOnlineStatus = useCallback(
+    async (online: boolean) => {
+      if (!roomId || !participantId) return;
+
+      try {
+        const participantRef = doc(
+          db,
+          "rooms",
+          roomId,
+          "participants",
+          participantId
+        );
+        await updateDoc(participantRef, {
+          online,
+          lastSeenAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error("Error updating online status:", err);
+      }
+    },
+    [roomId, participantId]
+  );
 
   // ルームデータの購読
   useEffect(() => {
@@ -74,13 +111,32 @@ export default function RoomPage() {
     const participantsRef = collection(db, "rooms", roomId, "participants");
 
     const unsubscribe = onSnapshot(participantsRef, (snapshot) => {
+      const now = Date.now();
       const participantsList: Participant[] = [];
+
       snapshot.forEach((participantDoc) => {
         const data = participantDoc.data();
+        const lastSeenAt = data.lastSeenAt as Timestamp | null;
+        const online = data.online === true;
+
+        // オフライン判定: online が false または lastSeenAt が 30秒以上前
+        let isOnline = online;
+        if (lastSeenAt) {
+          const lastSeenMs = lastSeenAt.toMillis();
+          const timeSinceLastSeen = now - lastSeenMs;
+          if (timeSinceLastSeen > PRESENCE_CONFIG.OFFLINE_THRESHOLD_MS) {
+            isOnline = false;
+          }
+        } else if (!online) {
+          isOnline = false;
+        }
+
         participantsList.push({
           participantId: participantDoc.id,
           name: data.name,
           selectedCard: data.selectedCard,
+          online: isOnline,
+          lastSeenAt,
         });
       });
 
@@ -98,7 +154,7 @@ export default function RoomPage() {
     return () => unsubscribe();
   }, [roomId, participantId]);
 
-  // 参加者の追加（まだ存在しない場合）
+  // 参加者の追加（まだ存在しない場合）とオンライン状態の設定
   useEffect(() => {
     if (!roomId || !participantId || !userName) return;
 
@@ -109,15 +165,24 @@ export default function RoomPage() {
       "participants",
       participantId
     );
+    participantRefRef.current = participantRef;
 
-    // 参加者が存在するか確認
+    // 参加者が存在するか確認して追加/更新
     const checkAndAdd = async () => {
       const snap = await getDoc(participantRef);
       if (!snap.exists()) {
         await setDoc(participantRef, {
           name: userName,
           selectedCard: null,
+          online: true,
+          lastSeenAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+        });
+      } else {
+        // 既存の参加者の場合、オンライン状態を更新
+        await updateDoc(participantRef, {
+          online: true,
+          lastSeenAt: serverTimestamp(),
         });
       }
     };
@@ -126,6 +191,72 @@ export default function RoomPage() {
       console.error("Error adding participant:", err);
     });
   }, [roomId, participantId, userName]);
+
+  // Heartbeat: 定期的にオンライン状態を更新
+  useEffect(() => {
+    console.log("[presence] start", roomId, participantId);
+    if (!roomId || !participantId) return;
+
+    const sendHeartbeat = async () => {
+      await updateOnlineStatus(true);
+    };
+
+    // 初回の heartbeat を即座に送信
+    sendHeartbeat();
+
+    // 定期的に heartbeat を送信
+    heartbeatIntervalRef.current = setInterval(
+      sendHeartbeat,
+      PRESENCE_CONFIG.HEARTBEAT_INTERVAL_MS
+    );
+
+    return () => {
+      console.log("[presence] cleanup", roomId, participantId);
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+      updateOnlineStatus(false).catch(() => {});
+    };
+  }, [roomId, participantId, updateOnlineStatus]);
+
+  // ページを離れる際にオフライン状態に設定
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // beforeunload では非同期処理が確実に実行されないため、
+      // navigator.sendBeacon や fetch を使う方が良いが、
+      // Firestore の updateDoc は非同期なので、ここでは試みるだけ
+      updateOnlineStatus(false).catch(() => {
+        // エラーは無視（ページが閉じられるため）
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // ページが非表示になったらオフライン状態に設定
+        updateOnlineStatus(false).catch((err) => {
+          console.error("Error updating offline status:", err);
+        });
+      } else if (document.visibilityState === "visible") {
+        // ページが表示されたらオンライン状態に設定
+        updateOnlineStatus(true).catch((err) => {
+          console.error("Error updating online status:", err);
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      // コンポーネントがアンマウントされる際にオフライン状態に設定
+      updateOnlineStatus(false).catch(() => {
+        // エラーは無視
+      });
+    };
+  }, [roomId, participantId, updateOnlineStatus]);
 
   const handleCardSelect = async (value: number) => {
     if (!roomId || isSubmitting) return;
@@ -205,6 +336,17 @@ export default function RoomPage() {
     }
   };
 
+  const handleGoHome = async () => {
+    // ホームに戻る前にオフライン状態に設定
+    await updateOnlineStatus(false);
+    router.push("/");
+  };
+
+  // オンライン参加者のみフィルタリング（showOffline が false の場合）
+  const visibleParticipants = showOffline
+    ? participants
+    : participants.filter((p) => p.online);
+
   if (!roomData) {
     return (
       <main className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -227,13 +369,23 @@ export default function RoomPage() {
                 ルーム: {roomId}
               </h1>
               <p className="text-gray-600 mt-1">
-                参加者: {participants.length}人
+                参加者: {visibleParticipants.length}人
+                {showOffline &&
+                  participants.length > visibleParticipants.length && (
+                    <span className="text-gray-400">
+                      {" "}
+                      (オフライン:{" "}
+                      {participants.length - visibleParticipants.length}人)
+                    </span>
+                  )}
                 {isHost && <span className="ml-2 text-blue-600">(ホスト)</span>}
               </p>
             </div>
             <button
-              onClick={() => router.push("/")}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              onClick={async () => {
+                await updateOnlineStatus(false).catch(() => {});
+                router.push("/");
+              }}
             >
               ← ホームに戻る
             </button>
@@ -274,41 +426,71 @@ export default function RoomPage() {
 
         {/* 参加者一覧 */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">参加者</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">参加者</h2>
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showOffline}
+                onChange={(e) => setShowOffline(e.target.checked)}
+                className="rounded"
+              />
+              <span>オフラインも表示</span>
+            </label>
+          </div>
           <div className="space-y-2">
-            {participants.map((participant) => {
-              const isMe = participant.participantId === participantId;
-              const hasVoted = participant.selectedCard !== null;
+            {visibleParticipants.length === 0 ? (
+              <p className="text-gray-400 text-center py-4">
+                オンラインの参加者はいません
+              </p>
+            ) : (
+              visibleParticipants.map((participant) => {
+                const isMe = participant.participantId === participantId;
+                const hasVoted = participant.selectedCard !== null;
 
-              return (
-                <div
-                  key={participant.participantId}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <span className="font-medium text-gray-800">
-                    {participant.name}
-                    {isMe && (
-                      <span className="ml-2 text-xs text-blue-600">
-                        (あなた)
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-gray-600">
-                    {hasVoted ? (
-                      isRevealed || isMe ? (
-                        <span className="font-bold text-blue-600">
-                          {participant.selectedCard}
+                return (
+                  <div
+                    key={participant.participantId}
+                    className={`flex items-center justify-between p-3 rounded-lg ${
+                      participant.online
+                        ? "bg-gray-50"
+                        : "bg-gray-100 opacity-60"
+                    }`}
+                  >
+                    <span className="font-medium text-gray-800 flex items-center gap-2">
+                      {participant.online ? (
+                        <span className="text-green-600" title="オンライン">
+                          ●
                         </span>
                       ) : (
-                        <span className="font-bold text-green-600">✓</span>
-                      )
-                    ) : (
-                      <span className="text-gray-400">未投票</span>
-                    )}
-                  </span>
-                </div>
-              );
-            })}
+                        <span className="text-gray-400" title="オフライン">
+                          ○
+                        </span>
+                      )}
+                      {participant.name}
+                      {isMe && (
+                        <span className="ml-2 text-xs text-blue-600">
+                          (あなた)
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-gray-600">
+                      {hasVoted ? (
+                        isRevealed || isMe ? (
+                          <span className="font-bold text-blue-600">
+                            {participant.selectedCard}
+                          </span>
+                        ) : (
+                          <span className="font-bold text-green-600">✓</span>
+                        )
+                      ) : (
+                        <span className="text-gray-400">未投票</span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
