@@ -32,7 +32,7 @@ interface Participant {
 }
 
 interface RoomData {
-  status: "voting" | "revealed";
+  status: "voting" | "revealed" | "ended";
   hostId: string;
   topic?: string;
   createdAt: unknown;
@@ -62,7 +62,7 @@ export default function RoomPage() {
   const [participantId] = useState(() => getOrCreateParticipantId());
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hideOffline, setHideOffline] = useState(false); // オフライン参加者も表示するか
+  const [hideOffline] = useState(false); // オフライン参加者も表示するか
 
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const participantRefRef = useRef(
@@ -117,6 +117,15 @@ export default function RoomPage() {
 
     return () => unsubscribe();
   }, [roomId, router]);
+
+  useEffect(() => {
+    if (roomData?.status === "ended") {
+      alert(
+        `このテーマはホストにより終了されました。\nルーム指定画面に戻ります。\n\nルームID：${roomId}`
+      );
+      router.push("/");
+    }
+  }, [roomData?.status, router]);
 
   // 参加者コレクションの購読
   useEffect(() => {
@@ -402,6 +411,26 @@ export default function RoomPage() {
       </main>
     );
   }
+
+  // ルーム終了用関数
+  const handleEndRoom = async () => {
+    if (!roomId || !isHost) return;
+
+    const ok = window.confirm(
+      `このテーマを終了しますか？\n他の参加者も退室となります。\n\nルームID：${roomId}`
+    );
+    if (!ok) return;
+
+    try {
+      await updateDoc(doc(db, "rooms", roomId), {
+        status: "ended",
+        endedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Error ending room:", err);
+      alert("ルーム終了に失敗しました");
+    }
+  };
 
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -738,7 +767,7 @@ export default function RoomPage() {
             {isRevealed && (
               <div className="max-w-4xl mx-auto mt-4 flex justify-end">
                 <button
-                  onClick={() => router.push("/")}
+                  onClick={handleEndRoom}
                   className="cursor-pointer inline-flex items-center px-4 text-sm font-medium hover:bg-gray-50"
                   style={{ fontSize: "16px", color: "#77787B" }}
                 >
