@@ -74,3 +74,4 @@ export const PRESENCE_CONFIG = {
   // オフライン判定の閾値（ミリ秒）
   OFFLINE_THRESHOLD_MS: 30000, // 30秒
 } as const;
+

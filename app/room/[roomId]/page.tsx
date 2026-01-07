@@ -21,6 +21,8 @@ import {
   PRESENCE_CONFIG,
 } from "../../../src/lib/utils";
 
+import { Copy, Check } from "lucide-react";
+
 interface Participant {
   participantId: string;
   name: string;
@@ -32,10 +34,21 @@ interface Participant {
 interface RoomData {
   status: "voting" | "revealed";
   hostId: string;
+  topic?: string;
   createdAt: unknown;
 }
 
 const CARD_VALUES = [1, 2, 3, 4, 5, 6, 7];
+
+const DELEGATION_LEVELS = [
+  { level: 1, title: "指示", description: "上司が決めて指示する" },
+  { level: 2, title: "説得", description: "上司が決めて説明・説得する" },
+  { level: 3, title: "相談", description: "意見を聞いた上で上司が決める" },
+  { level: 4, title: "合意", description: "話し合って一緒に決める" },
+  { level: 5, title: "助言", description: "部下が決め、必要なら助言する" },
+  { level: 6, title: "委任", description: "部下が自由に決めて実行する" },
+  { level: 7, title: "報告", description: "部下が決め、事後報告のみ" },
+];
 
 export default function RoomPage() {
   const params = useParams();
@@ -49,7 +62,7 @@ export default function RoomPage() {
   const [participantId] = useState(() => getOrCreateParticipantId());
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showOffline, setShowOffline] = useState(false); // オフライン参加者も表示するか
+  const [hideOffline, setHideOffline] = useState(false); // オフライン参加者も表示するか
 
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const participantRefRef = useRef(
@@ -59,6 +72,7 @@ export default function RoomPage() {
   const isHost = roomData ? getHostId(roomId) === roomData.hostId : false;
   const isVoting = roomData?.status === "voting";
   const isRevealed = roomData?.status === "revealed";
+  const [copied, setCopied] = useState(false);
 
   // オンライン状態を更新する関数
   const updateOnlineStatus = useCallback(
@@ -194,7 +208,6 @@ export default function RoomPage() {
 
   // Heartbeat: 定期的にオンライン状態を更新
   useEffect(() => {
-    console.log("[presence] start", roomId, participantId);
     if (!roomId || !participantId) return;
 
     const sendHeartbeat = async () => {
@@ -211,7 +224,6 @@ export default function RoomPage() {
     );
 
     return () => {
-      console.log("[presence] cleanup", roomId, participantId);
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
         heartbeatIntervalRef.current = null;
@@ -336,16 +348,49 @@ export default function RoomPage() {
     }
   };
 
-  const handleGoHome = async () => {
-    // ホームに戻る前にオフライン状態に設定
-    await updateOnlineStatus(false);
-    router.push("/");
+  const CARD_VALUES = [1, 2, 3, 4, 5, 6, 7];
+  // 投票結果を集計する関数
+  const tallyVotes = (participants: { selectedCard: number | null }[]) => {
+    const counts: Record<number, number> = Object.fromEntries(
+      CARD_VALUES.map((v) => [v, 0])
+    ) as Record<number, number>;
+
+    for (const p of participants) {
+      if (p.selectedCard != null)
+        counts[p.selectedCard] = (counts[p.selectedCard] ?? 0) + 1;
+    }
+    return counts;
   };
 
-  // オンライン参加者のみフィルタリング（showOffline が false の場合）
-  const visibleParticipants = showOffline
-    ? participants
-    : participants.filter((p) => p.online);
+  const counts = tallyVotes(participants);
+
+  // 投票数を順位付きでソート
+  const ranked = [...CARD_VALUES]
+    .map((v) => ({ value: v, count: counts[v] ?? 0 }))
+    .sort((a, b) => b.count - a.count);
+  const Crown = ({ rank }: { rank: number }) => {
+    if (rank === 1) return <span className="text-yellow-400 text-3xl">👑</span>;
+    if (rank === 2) return <span className="text-gray-400 text-2xl">🥈</span>;
+    if (rank === 3) return <span className="text-amber-700 text-2xl">🥉</span>;
+    return null;
+  };
+
+  // 同票対策：順位Map（value -> rank）
+  const rankMap = new Map<number, number>();
+  ranked.forEach((item, index) => {
+    if (!rankMap.has(item.value)) {
+      rankMap.set(item.value, index + 1);
+    }
+  });
+
+  // オンライン参加者のみフィルタリング（hideOffline が true の場合）
+  const visibleParticipants = hideOffline
+    ? participants.filter((p) => p.online) // チェックON → オンラインだけ
+    : participants;
+
+  const notVotedCount = visibleParticipants.filter(
+    (p) => p.selectedCard === null
+  ).length;
 
   if (!roomData) {
     return (
@@ -360,83 +405,210 @@ export default function RoomPage() {
 
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="max-w-4xl mx-auto mb-4 flex items-center justify-between">
+        {/* 左：ルームID + コピー */}
+        <div className="flex items-center gap-2 text-gray-600">
+          <span>ルームID：</span>
+          <span className="text-2xl font-mono text-gray-800">{roomId}</span>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await navigator.clipboard.writeText(roomId);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition"
+            title="コピー"
+          >
+            {copied ? (
+              <Check size={18} className="text-green-600" />
+            ) : (
+              <Copy size={18} />
+            )}
+          </button>
+        </div>
+
+        <button
+          onClick={() => router.push("/")}
+          className="cursor-pointer inline-flex items-center px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          style={{ fontSize: "18px", color: "#77787B" }}
+        >
+          ＜　ルーム指定に戻る
+        </button>
+      </div>
+
       <div className="max-w-4xl mx-auto">
         {/* ヘッダー */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">
-                ルーム: {roomId}
-              </h1>
-              <p className="text-gray-600 mt-1">
-                参加者: {visibleParticipants.length}人
-                {showOffline &&
-                  participants.length > visibleParticipants.length && (
-                    <span className="text-gray-400">
-                      {" "}
-                      (オフライン:{" "}
-                      {participants.length - visibleParticipants.length}人)
-                    </span>
-                  )}
-                {isHost && <span className="ml-2 text-blue-600">(ホスト)</span>}
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                await updateOnlineStatus(false).catch(() => {});
-                router.push("/");
-              }}
-            >
-              ← ホームに戻る
-            </button>
+          <div className="flex justify-center">
+            <h1 className="text-3xl font-bold text-gray-800 text-center">
+              {roomData?.topic ?? "（未設定）"}
+            </h1>
           </div>
         </div>
-
         {/* カード選択エリア */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800 text-center">
             権限レベルを選択してください
           </h2>
-          <div className="grid grid-cols-7 gap-3 mb-6">
-            {CARD_VALUES.map((value) => (
-              <button
-                key={value}
-                onClick={() => handleCardSelect(value)}
-                disabled={isSubmitting}
-                className={`
-                  aspect-square rounded-lg font-bold text-lg transition-all
+
+          {/* 1〜7の定義 */}
+          {(() => {
+            const LEVELS = [
+              { level: 1, title: "指示", description: "上司が決めて指示する" },
+              {
+                level: 2,
+                title: "説得",
+                description: "上司が決めて説明・説得する",
+              },
+              {
+                level: 3,
+                title: "相談",
+                description: "意見を聞いた上で上司が決める",
+              },
+              {
+                level: 4,
+                title: "合意",
+                description: "話し合って一緒に決める",
+              },
+              {
+                level: 5,
+                title: "助言",
+                description: "部下が決め、必要なら助言する",
+              },
+              {
+                level: 6,
+                title: "委任",
+                description: "部下が自由に決めて実行する",
+              },
+              {
+                level: 7,
+                title: "報告",
+                description: "部下が決め、事後報告のみ",
+              },
+            ];
+
+            return (
+              <>
+                {/* レベル説明一覧 */}
+                <div className="mt-6 mb-8 rounded-lg bg-gray-50 px-4 py-3 text-sm">
+                  <ul className="space-y-1">
+                    {LEVELS.map((l) => {
+                      const active = selectedCard === l.level;
+
+                      return (
+                        <li
+                          key={l.level}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleCardSelect(l.level)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ")
+                              handleCardSelect(l.level);
+                          }}
+                          className={`
+        flex gap-2 items-start rounded-md px-2 py-1 transition-colors
+        cursor-pointer select-none
+        ${active ? "bg-pink-100" : "hover:bg-gray-100"}
+      `}
+                        >
+                          <span
+                            className={`
+          font-semibold whitespace-nowrap
+          ${active ? "text-pink-600" : "text-red-500"}
+        `}
+                          >
+                            {l.level}
+                          </span>
+
+                          <span
+                            className={`
+          font-semibold whitespace-nowrap
+          ${active ? "text-pink-600" : "text-red-500"}
+        `}
+                          >
+                            {l.title}
+                          </span>
+
+                          <span className="text-gray-600">
+                            　：　{l.description}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+
+                {/* カード */}
+                <div className="grid grid-cols-7 gap-3 mb-6">
+                  {CARD_VALUES.map((value) => {
+                    const meta = LEVELS.find((x) => x.level === value);
+                    const active = selectedCard === value;
+
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => handleCardSelect(value)}
+                        disabled={isSubmitting}
+                        className={`
+                  group relative aspect-square rounded-lg font-bold transition-all
                   ${
-                    selectedCard === value
-                      ? "bg-blue-600 text-white scale-110 shadow-lg"
+                    active
+                      ? "bg-pink-600/30 text-white scale-110 shadow-lg"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
-          {selectedCard && (
-            <p className="text-sm text-gray-600 text-center">
-              選択中: {selectedCard}
-            </p>
-          )}
-        </div>
+                      >
+                        {/* 数字 */}
+                        <div className="text-lg leading-none">{value}</div>
 
+                        {/* タイトル */}
+                        <div
+                          className="mt-3 font-medium leading-none text-red-500"
+                          style={{ fontSize: "16px" }}
+                        >
+                          {meta?.title ?? ""}
+                        </div>
+
+                        {/* ツールチップ */}
+                        <div
+                          className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 hidden group-hover:block w-40 whitespace-normal break-words text-center rounded-md bg-gray-900 px-3 py-2 text-xs text-white leading-relaxed shadow-lg"
+                          style={{ fontSize: "14px" }}
+                        >
+                          {meta?.description ?? ""}
+                          <div className="absolute left-1/2 bottom-full -translate-x-1/2 h-0 w-0 border-x-4 border-x-transparent border-b-4 border-b-gray-900" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+        </div>
+        <p className="text-gray-600 mt-1 text-right mr-3">
+          参加者 ： {visibleParticipants.length} 人
+        </p>
+        <p className="text-sm text-gray-600 mt-1 text-right">
+          （未投票 ： {notVotedCount} 人）
+        </p>
         {/* 参加者一覧 */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">参加者</h2>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 text-center">
+              参加者
+            </h2>
+            {/* <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
               <input
                 type="checkbox"
-                checked={showOffline}
-                onChange={(e) => setShowOffline(e.target.checked)}
+                checked={hideOffline}
+                onChange={(e) => setHideOffline(e.target.checked)}
                 className="rounded"
               />
-              <span>オフラインも表示</span>
-            </label>
+              <span>オフラインを非表示</span>
+            </label> */}
           </div>
           <div className="space-y-2">
             {visibleParticipants.length === 0 ? (
@@ -444,18 +616,15 @@ export default function RoomPage() {
                 オンラインの参加者はいません
               </p>
             ) : (
-              visibleParticipants.map((participant) => {
+              visibleParticipants.map((participant, index) => {
                 const isMe = participant.participantId === participantId;
                 const hasVoted = participant.selectedCard !== null;
-
+                const zebraBg = index % 2 === 0 ? "bg-gray-200" : "bg-white";
+                const offlineStyle = participant.online ? "" : "opacity-80";
                 return (
                   <div
                     key={participant.participantId}
-                    className={`flex items-center justify-between p-3 rounded-lg ${
-                      participant.online
-                        ? "bg-gray-50"
-                        : "bg-gray-100 opacity-60"
-                    }`}
+                    className={`flex items-center justify-between p-3 rounded-lg ${zebraBg} ${offlineStyle}`}
                   >
                     <span className="font-medium text-gray-800 flex items-center gap-2">
                       {participant.online ? (
@@ -463,14 +632,19 @@ export default function RoomPage() {
                           ●
                         </span>
                       ) : (
-                        <span className="text-gray-400" title="オフライン">
+                        <span className="text-gray-600" title="オフライン">
                           ○
                         </span>
                       )}
                       {participant.name}
-                      {isMe && (
+                      {isMe && !isHost && (
                         <span className="ml-2 text-xs text-blue-600">
                           (あなた)
+                        </span>
+                      )}
+                      {isMe && isHost && (
+                        <span className="ml-2 text-xs text-blue-600">
+                          (あなた・ホスト)
                         </span>
                       )}
                     </span>
@@ -493,7 +667,53 @@ export default function RoomPage() {
             )}
           </div>
         </div>
+        {/* 投票結果集計エリア */}
+        {isRevealed && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6 mt-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800 text-center">
+              投票結果
+            </h2>
 
+            <div className="grid grid-cols-7 gap-3">
+              {CARD_VALUES.map((v) => {
+                const rank = rankMap.get(v);
+                const voteCount = counts[v] ?? 0;
+                const showCrown = voteCount > 0 && rank && rank <= 3;
+
+                return (
+                  <div
+                    key={v}
+                    className={`rounded-lg p-3 text-center relative ${
+                      rank === 1 && voteCount > 0
+                        ? "bg-yellow-50"
+                        : "bg-gray-50"
+                    }`}
+                  >
+                    {/* 王冠（左上） */}
+                    {showCrown && (
+                      <div className="absolute top-1 left-1">
+                        <Crown rank={rank!} />
+                      </div>
+                    )}
+
+                    <div className="text-lg font-bold">{v}</div>
+
+                    <div
+                      className="text-sm text-red-500"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {voteCount}票
+                    </div>
+
+                    {showCrown && (
+                      <div className="mt-1 text-xs text-gray-500">{rank}位</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {/* ホスト専用アクションボタン */}
         {isHost && (
           <div className="bg-white rounded-lg shadow-lg p-6">
@@ -501,9 +721,9 @@ export default function RoomPage() {
               {isVoting && (
                 <button
                   onClick={handleReveal}
-                  className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                  className="cursor-pointer flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
                 >
-                  結果を表示 (Reveal)
+                  投票を締め切る
                 </button>
               )}
               {isRevealed && (
@@ -511,10 +731,21 @@ export default function RoomPage() {
                   onClick={handleNextRound}
                   className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-medium hover:bg-gray-700 transition-colors"
                 >
-                  次のラウンド (Next Round)
+                  同じテーマで再投票
                 </button>
               )}
             </div>
+            {isRevealed && (
+              <div className="max-w-4xl mx-auto mt-4 flex justify-end">
+                <button
+                  onClick={() => router.push("/")}
+                  className="cursor-pointer inline-flex items-center px-4 text-sm font-medium hover:bg-gray-50"
+                  style={{ fontSize: "16px", color: "#77787B" }}
+                >
+                  ＜　このテーマを終了する
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
