@@ -8,6 +8,7 @@ import {
   collection,
   onSnapshot,
   updateDoc,
+  addDoc,
   setDoc,
   serverTimestamp,
   getDoc,
@@ -36,6 +37,15 @@ interface RoomData {
   hostId: string;
   topic?: string;
   createdAt: unknown;
+}
+
+interface VoteResult {
+  roomId: string;
+  topic: string;
+  first: number | null;
+  second: number | null;
+  third: number | null;
+  votedAt: Timestamp;
 }
 
 const CARD_VALUES = [1, 2, 3, 4, 5, 6, 7];
@@ -97,6 +107,40 @@ export default function RoomPage() {
     },
     [roomId, participantId]
   );
+
+  // 投票結果データ保存用取得処理
+  const getTop3 = () => {
+    const sorted = [...CARD_VALUES]
+      .map((v) => ({ value: v, count: counts[v] ?? 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    const getRankValue = (rank: number) => {
+      const item = sorted[rank - 1];
+      return item && item.count > 0 ? item.value : null;
+    };
+
+    return {
+      first: getRankValue(1),
+      second: getRankValue(2),
+      third: getRankValue(3),
+    };
+  };
+
+  // 投票結果データ保存処理
+  const saveVoteResult = async () => {
+    if (!roomId || !roomData) return;
+
+    const { first, second, third } = getTop3();
+
+    await addDoc(collection(db, "vote_results"), {
+      roomId,
+      topic: roomData.topic ?? "",
+      first,
+      second,
+      third,
+      votedAt: serverTimestamp(),
+    });
+  };
 
   // ルームデータの購読
   useEffect(() => {
@@ -309,6 +353,7 @@ export default function RoomPage() {
     }
   };
 
+  // 投票締め切り処理
   const handleReveal = async () => {
     if (!roomId || !isHost) return;
 
@@ -317,6 +362,7 @@ export default function RoomPage() {
       await updateDoc(roomRef, {
         status: "revealed",
       });
+      await saveVoteResult();
     } catch (err) {
       console.error("Error revealing results:", err);
       alert("結果の表示に失敗しました");
@@ -653,7 +699,7 @@ export default function RoomPage() {
                 return (
                   <div
                     key={participant.participantId}
-                    className={`flex items-center justify-between p-3 rounded-lg ${zebraBg} ${offlineStyle}`}
+                    className={`flex h-10 items-center justify-between p-3 rounded-lg ${zebraBg} ${offlineStyle}`}
                   >
                     <span className="font-medium text-gray-800 flex items-center gap-2">
                       {participant.online ? (
@@ -680,7 +726,7 @@ export default function RoomPage() {
                     <span className="text-gray-600">
                       {hasVoted ? (
                         isRevealed || isMe ? (
-                          <span className="font-bold text-blue-600">
+                          <span className="font-bold text-red-600 mr-4 text-lg">
                             {participant.selectedCard}
                           </span>
                         ) : (
