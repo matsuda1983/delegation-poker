@@ -246,8 +246,8 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-8 bg-gradient-to-br from-white-50 to-indigo-100">
-      <div className="w-[95%] md:w-[70%] max-w-6xl mx-auto mt-16">
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 pt-16">
+      <div className="w-[95%] md:w-[70%] max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold text-center mb-2 text-gray-800">
           Delegation Poker
         </h1>
@@ -257,7 +257,18 @@ export default function Home() {
         <button
           type="button"
           onClick={openResultsModal}
-          className="mt-2 mb-6 mx-auto block rounded-md border border-gray-600 bg-white px-6 py-2 text-xl text-gray-700 hover:bg-gray-50"
+          className="
+    mt-2 mb-6 mx-auto block
+    h-[52px] px-6
+    rounded-xl
+    border border-gray-400
+    bg-white
+    text-lg text-gray-700 font-medium
+    shadow-sm
+    transition-all duration-200
+    hover:-translate-y-[1px] hover:shadow-md hover:bg-gray-50
+    active:translate-y-0
+  "
         >
           過去の投票結果を見る
         </button>
@@ -268,16 +279,14 @@ export default function Home() {
           </div>
         )}
 
-        <div
-          className="rounded-lg shadow-lg p-8"
-          style={{ backgroundColor: "rgb(127 127 127)" }}
-        >
+        <div className="bg-white border border-gray-300 rounded-xl p-6 shadow-md">
           {/* 3カード構成 */}
           <div className="space-y-8">
             {/* ① 氏名カード */}
-            <div className="bg-white rounded-lg shadow-lg p-8">
+            {/* ① 氏名カード */}
+            <div className="bg-white border border-gray-300 rounded-xl p-6 shadow-md">
               {" "}
-              <h2 className="text-center text-lg font-semibold text-gray-800 mb-4">
+              <h2 className="text-center text-base font-medium tracking-wide text-gray-800 mb-4">
                 基本情報
               </h2>
               <div>
@@ -289,7 +298,7 @@ export default function Home() {
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   placeholder="名前を入力"
-                  className="w-full h-14 px-4 border border-gray-500 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full h-14 px-4 border border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   maxLength={20}
                 />
               </div>
@@ -298,8 +307,8 @@ export default function Home() {
             {/* ② 下段：作成/参加カード（2枚） */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               {/* ②-1 作成カード */}
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <h2 className="text-center text-lg font-semibold text-gray-800 mb-6">
+              <div className="bg-white border border-gray-300 rounded-xl p-6 shadow-md">
+                <h2 className="text-center text-base font-medium tracking-wide text-gray-800 mb-6">
                   新しいルームを作成
                 </h2>
 
@@ -310,21 +319,32 @@ export default function Home() {
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   placeholder="〇〇の権限委譲について"
-                  className="w-full h-14 px-4 border border-gray-500 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full h-14 px-4 border border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
 
                 <button
                   onClick={handleCreateRoom}
                   disabled={isCreating || isJoining}
-                  className="cursor-pointer mt-10 w-full h-14 bg-blue-600/70 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                  className="
+    cursor-pointer
+    mt-10 w-full h-[52px]
+    rounded-xl
+    bg-gradient-to-r from-blue-500 to-indigo-500
+    text-white text-lg font-semibold
+    shadow-md
+    transition-all duration-200
+    hover:-translate-y-[1px] hover:shadow-lg
+    active:translate-y-0 active:shadow-md
+    disabled:opacity-60 disabled:cursor-not-allowed
+  "
                 >
                   {isCreating ? "作成中..." : "ルームを作成"}
                 </button>
               </div>
 
               {/* ②-2 参加カード */}
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <h2 className="text-center text-lg font-semibold text-gray-800 mb-6">
+              <div className="bg-white border border-gray-300 rounded-xl p-6 shadow-md">
+                <h2 className="text-center text-base font-medium tracking-wide text-gray-800 mb-6">
                   既存のルームに参加
                 </h2>
 
@@ -338,7 +358,7 @@ export default function Home() {
                     className={`
                       w-full h-14
                       px-4 pr-10
-                      border border-gray-500 rounded-lg
+                      border border-gray-400 rounded-lg
                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
                       bg-white appearance-none
                       ${roomId === "" ? "text-gray-400" : "text-gray-800"}
@@ -374,7 +394,18 @@ export default function Home() {
                 <button
                   onClick={handleJoinRoom}
                   disabled={isCreating || isJoining}
-                  className="cursor-pointer mt-10 w-full h-14 bg-pink-500/80 hover:bg-pink-500 text-white rounded-lg font-semibold text-lg hover:bg-indigo-700 disabled:bg-gray-400 transition-colors"
+                  className="
+    cursor-pointer
+    mt-10 w-full h-[52px]
+    rounded-xl
+    bg-gradient-to-r from-slate-600 to-slate-700
+    text-white text-lg font-semibold
+    shadow-md
+    transition-all duration-200
+    hover:-translate-y-[1px] hover:shadow-lg
+    active:translate-y-0 active:shadow-md
+    disabled:opacity-60 disabled:cursor-not-allowed
+  "
                 >
                   {isJoining ? "参加中..." : "ルームに参加"}
                 </button>
@@ -389,11 +420,13 @@ export default function Home() {
           onClick={() => setIsResultsOpen(false)}
         >
           <div
-            className="w-full max-w-3xl rounded-lg bg-white shadow-lg"
+            className="bg-white border border-gray-200 rounded-xl p-6 w-full max-w-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b px-5 py-4">
-              <h2 className="text-lg font-semibold text-gray-800">投票結果</h2>
+              <h2 className="text-base font-medium tracking-wide text-gray-800">
+                投票結果
+              </h2>
               <button
                 className="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
                 onClick={() => setIsResultsOpen(false)}

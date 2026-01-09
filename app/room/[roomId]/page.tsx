@@ -479,12 +479,15 @@ export default function RoomPage() {
   };
 
   return (
-    <main className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-4xl mx-auto mb-4 flex items-center justify-between">
-        {/* 左：ルームID + コピー */}
-        <div className="flex items-center gap-2 text-gray-600">
-          <span>ルームID：</span>
-          <span className="text-2xl font-mono text-gray-800">{roomId}</span>
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 px-6 md:px-8 pt-12 pb-10">
+      {/* 上部バー */}
+      <div className="max-w-4xl mx-auto mb-6 flex items-center justify-between">
+        {/* ルームID + コピー */}
+        <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm">
+          <span className="text-sm text-slate-500">ルームID</span>
+          <span className="text-lg font-mono font-semibold text-slate-900">
+            {roomId}
+          </span>
 
           <button
             type="button"
@@ -493,42 +496,54 @@ export default function RoomPage() {
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             }}
-            className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition"
+            className="ml-1 inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
             title="コピー"
           >
             {copied ? (
-              <Check size={18} className="text-green-600" />
+              <Check size={18} className="text-emerald-600" />
             ) : (
               <Copy size={18} />
             )}
           </button>
         </div>
 
+        {/* 戻る */}
         <button
           onClick={() => router.push("/")}
-          className="cursor-pointer inline-flex items-center px-4 py-2 text-sm font-medium hover:bg-gray-50"
-          style={{ fontSize: "18px", color: "#77787B" }}
+          className="
+            inline-flex items-center gap-2
+            rounded-xl border border-slate-300 bg-white
+            px-4 h-[44px]
+            text-sm font-medium text-slate-600
+            hover:bg-slate-50 hover:text-slate-800
+            transition
+          "
         >
-          ＜　ルーム指定に戻る
+          ＜ ルーム指定に戻る
         </button>
       </div>
 
-      <div className="max-w-4xl mx-auto">
-        {/* ヘッダー */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex justify-center">
-            <h1 className="text-3xl font-bold text-gray-800 text-center">
-              {roomData?.topic ?? "（未設定）"}
-            </h1>
-          </div>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* テーマ */}
+        <div className="rounded-xl border border-slate-300 bg-white p-6 shadow-sm">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 text-center tracking-tight">
+            {roomData?.topic ?? "（未設定）"}
+          </h1>
         </div>
-        {/* カード選択エリア */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800 text-center">
+
+        {/* カード選択 */}
+        <div className="rounded-xl border border-slate-300 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900 text-center">
             権限レベルを選択してください
           </h2>
 
-          {/* 1〜7の定義 */}
+          {!isVoting && (
+            <div className="mt-2 mb-4 flex items-center justify-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+              <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
+              <span className="font-medium">投票は締め切られました</span>
+            </div>
+          )}
+
           {(() => {
             const LEVELS = [
               { level: 1, title: "指示", description: "上司が決めて指示する" },
@@ -566,12 +581,11 @@ export default function RoomPage() {
 
             return (
               <>
-                {/* レベル説明一覧 */}
-                <div className="mt-6 mb-8 rounded-lg bg-gray-50 px-4 py-3 text-sm">
+                {/* 説明 */}
+                <div className="mt-5 mb-7 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                   <ul className="space-y-1">
                     {LEVELS.map((l) => {
                       const active = selectedCard === l.level;
-
                       return (
                         <li
                           key={l.level}
@@ -583,31 +597,27 @@ export default function RoomPage() {
                               handleCardSelect(l.level);
                           }}
                           className={`
-        flex gap-2 items-start rounded-md px-2 py-1 transition-colors
-        cursor-pointer select-none
-        ${active ? "bg-pink-100" : "hover:bg-gray-100"}
-      `}
+                            flex gap-2 items-start rounded-lg px-2 py-1
+                            cursor-pointer select-none transition-colors
+                            ${active ? "bg-pink-100" : "hover:bg-slate-100"}
+                          `}
                         >
                           <span
-                            className={`
-          font-semibold whitespace-nowrap
-          ${active ? "text-pink-600" : "text-red-500"}
-        `}
+                            className={`font-semibold whitespace-nowrap ${
+                              active ? "text-pink-600" : "text-red-500"
+                            }`}
                           >
                             {l.level}
                           </span>
-
                           <span
-                            className={`
-          font-semibold whitespace-nowrap
-          ${active ? "text-pink-600" : "text-red-500"}
-        `}
+                            className={`font-semibold whitespace-nowrap ${
+                              active ? "text-pink-600" : "text-red-500"
+                            }`}
                           >
                             {l.title}
                           </span>
-
-                          <span className="text-gray-600">
-                            　：　{l.description}
+                          <span className="text-slate-600">
+                            ：{l.description}
                           </span>
                         </li>
                       );
@@ -616,7 +626,7 @@ export default function RoomPage() {
                 </div>
 
                 {/* カード */}
-                <div className="grid grid-cols-7 gap-3 mb-6">
+                <div className="grid grid-cols-7 gap-3">
                   {CARD_VALUES.map((value) => {
                     const meta = LEVELS.find((x) => x.level === value);
                     const active = selectedCard === value;
@@ -627,19 +637,17 @@ export default function RoomPage() {
                         onClick={() => handleCardSelect(value)}
                         disabled={isSubmitting}
                         className={`
-                  group relative aspect-square rounded-lg font-bold transition-all
-                  ${
-                    active
-                      ? "bg-pink-600/30 text-white scale-110 shadow-lg"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                `}
+                          group relative aspect-square rounded-xl font-bold transition-all
+                          border
+                          ${
+                            active
+                              ? "bg-pink-600/20 border-pink-300 text-slate-900 scale-[1.06] shadow-md"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                          }
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                        `}
                       >
-                        {/* 数字 */}
                         <div className="text-lg leading-none">{value}</div>
-
-                        {/* タイトル */}
                         <div
                           className="mt-3 font-medium leading-none text-red-500"
                           style={{ fontSize: "16px" }}
@@ -647,13 +655,12 @@ export default function RoomPage() {
                           {meta?.title ?? ""}
                         </div>
 
-                        {/* ツールチップ */}
                         <div
-                          className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 hidden group-hover:block w-40 whitespace-normal break-words text-center rounded-md bg-gray-900 px-3 py-2 text-xs text-white leading-relaxed shadow-lg"
+                          className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 hidden group-hover:block w-40 whitespace-normal break-words text-center rounded-md bg-slate-900 px-3 py-2 text-xs text-white leading-relaxed shadow-lg"
                           style={{ fontSize: "14px" }}
                         >
                           {meta?.description ?? ""}
-                          <div className="absolute left-1/2 bottom-full -translate-x-1/2 h-0 w-0 border-x-4 border-x-transparent border-b-4 border-b-gray-900" />
+                          <div className="absolute left-1/2 bottom-full -translate-x-1/2 h-0 w-0 border-x-4 border-x-transparent border-b-4 border-b-slate-900" />
                         </div>
                       </button>
                     );
@@ -663,51 +670,49 @@ export default function RoomPage() {
             );
           })()}
         </div>
-        <p className="text-gray-600 mt-1 text-right mr-3">
-          参加者 ： {visibleParticipants.length} 人
-        </p>
-        <p className="text-sm text-gray-600 mt-1 text-right">
-          （未投票 ： {notVotedCount} 人）
-        </p>
-        {/* 参加者一覧 */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold text-gray-800 text-center">
-              参加者
-            </h2>
-            {/* <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hideOffline}
-                onChange={(e) => setHideOffline(e.target.checked)}
-                className="rounded"
-              />
-              <span>オフラインを非表示</span>
-            </label> */}
+
+        {/* 参加者 */}
+        <div className="rounded-xl border border-slate-300 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900 text-center mb-4">
+            参加者
+          </h2>
+
+          <div className="mb-4 flex justify-end text-right text-slate-600">
+            <div>
+              <div className="text-sm mr-2">
+                参加者：{visibleParticipants.length} 人
+              </div>
+              <div className="text-xs text-slate-500">
+                （未投票：{notVotedCount} 人）
+              </div>
+            </div>
           </div>
+
           <div className="space-y-2">
             {visibleParticipants.length === 0 ? (
-              <p className="text-gray-400 text-center py-4">
+              <p className="text-slate-400 text-center py-4">
                 オンラインの参加者はいません
               </p>
             ) : (
               visibleParticipants.map((participant, index) => {
                 const isMe = participant.participantId === participantId;
                 const hasVoted = participant.selectedCard !== null;
-                const zebraBg = index % 2 === 0 ? "bg-gray-200" : "bg-white";
+
+                const zebraBg = index % 2 === 0 ? "bg-slate-100" : "bg-white";
                 const offlineStyle = participant.online ? "" : "opacity-80";
+
                 return (
                   <div
                     key={participant.participantId}
-                    className={`flex h-10 items-center justify-between p-3 rounded-lg ${zebraBg} ${offlineStyle}`}
+                    className={`flex h-11 items-center justify-between px-3 rounded-xl border border-slate-200 ${zebraBg} ${offlineStyle}`}
                   >
-                    <span className="font-medium text-gray-800 flex items-center gap-2">
+                    <span className="font-medium text-slate-900 flex items-center gap-2">
                       {participant.online ? (
-                        <span className="text-green-600" title="オンライン">
+                        <span className="text-emerald-600" title="オンライン">
                           ●
                         </span>
                       ) : (
-                        <span className="text-gray-600" title="オフライン">
+                        <span className="text-slate-500" title="オフライン">
                           ○
                         </span>
                       )}
@@ -723,17 +728,18 @@ export default function RoomPage() {
                         </span>
                       )}
                     </span>
-                    <span className="text-gray-600">
+
+                    <span className="text-slate-600">
                       {hasVoted ? (
                         isRevealed || isMe ? (
-                          <span className="font-bold text-red-600 mr-4 text-lg">
+                          <span className="font-bold text-red-600 mr-1 text-lg">
                             {participant.selectedCard}
                           </span>
                         ) : (
-                          <span className="font-bold text-green-600">✓</span>
+                          <span className="font-bold text-emerald-600">✓</span>
                         )
                       ) : (
-                        <span className="text-gray-400">未投票</span>
+                        <span className="text-slate-400">未投票</span>
                       )}
                     </span>
                   </div>
@@ -742,10 +748,11 @@ export default function RoomPage() {
             )}
           </div>
         </div>
-        {/* 投票結果集計エリア */}
+
+        {/* 結果 */}
         {isRevealed && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6 mt-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800 text-center">
+          <div className="rounded-xl border border-slate-300 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900 text-center mb-4">
               投票結果
             </h2>
 
@@ -758,30 +765,29 @@ export default function RoomPage() {
                 return (
                   <div
                     key={v}
-                    className={`rounded-lg p-3 text-center relative ${
+                    className={`rounded-xl p-3 text-center relative border ${
                       rank === 1 && voteCount > 0
-                        ? "bg-yellow-50"
-                        : "bg-gray-50"
+                        ? "bg-yellow-50 border-yellow-200"
+                        : "bg-slate-50 border-slate-200"
                     }`}
                   >
-                    {/* 王冠（左上） */}
                     {showCrown && (
                       <div className="absolute top-1 left-1">
                         <Crown rank={rank!} />
                       </div>
                     )}
 
-                    <div className="text-lg font-bold">{v}</div>
-
+                    <div className="text-lg font-bold text-slate-900">{v}</div>
                     <div
                       className="text-sm text-red-500"
                       style={{ fontSize: "14px" }}
                     >
                       {voteCount}票
                     </div>
-
                     {showCrown && (
-                      <div className="mt-1 text-xs text-gray-500">{rank}位</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {rank}位
+                      </div>
                     )}
                   </div>
                 );
@@ -789,35 +795,56 @@ export default function RoomPage() {
             </div>
           </div>
         )}
-        {/* ホスト専用アクションボタン */}
+
+        {/* ホスト操作 */}
         {isHost && (
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="rounded-xl border border-slate-300 bg-white p-6 shadow-sm">
             <div className="flex gap-3">
               {isVoting && (
                 <button
                   onClick={handleReveal}
-                  className="cursor-pointer flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                  className="
+                    flex-1 h-[52px] rounded-xl
+                    bg-emerald-600 text-white font-semibold
+                    shadow-sm transition
+                    hover:bg-emerald-700 hover:translate-y-[-1px]
+                    active:translate-y-0
+                  "
                 >
                   投票を締め切る
                 </button>
               )}
+
               {isRevealed && (
                 <button
                   onClick={handleNextRound}
-                  className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-medium hover:bg-gray-700 transition-colors"
+                  className="
+                    flex-1 h-[52px] rounded-xl
+                    bg-slate-700 text-white font-semibold
+                    shadow-sm transition
+                    hover:bg-slate-800 hover:translate-y-[-1px]
+                    active:translate-y-0
+                  "
                 >
                   同じテーマで再投票
                 </button>
               )}
             </div>
+
             {isRevealed && (
-              <div className="max-w-4xl mx-auto mt-4 flex justify-end">
+              <div className="mt-4 flex justify-end">
                 <button
                   onClick={handleEndRoom}
-                  className="cursor-pointer inline-flex items-center px-4 text-sm font-medium hover:bg-gray-50"
-                  style={{ fontSize: "16px", color: "#77787B" }}
+                  className="
+                    inline-flex items-center gap-2
+                    rounded-xl border border-slate-300 bg-white
+                    px-4 h-[44px]
+                    text-sm font-medium text-slate-600
+                    hover:bg-slate-50 hover:text-slate-800
+                    transition
+                  "
                 >
-                  ＜　このテーマを終了する
+                  ＜ このテーマを終了する
                 </button>
               </div>
             )}
