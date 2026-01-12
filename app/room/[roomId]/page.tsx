@@ -20,6 +20,7 @@ import {
   getOrCreateParticipantId,
   getHostId,
   PRESENCE_CONFIG,
+  withName,
 } from "../../../src/lib/utils";
 
 import { Copy, Check } from "lucide-react";
@@ -97,10 +98,17 @@ export default function RoomPage() {
           "participants",
           participantId
         );
-        await updateDoc(participantRef, {
-          online,
-          lastSeenAt: serverTimestamp(),
-        });
+
+        await setDoc(
+          participantRef,
+          {
+            // name は既存を壊さないよう merge 前提でOK
+            online,
+            lastSeenAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
       } catch (err) {
         console.error("Error updating online status:", err);
       }
@@ -151,7 +159,7 @@ export default function RoomPage() {
     const unsubscribe = onSnapshot(roomRef, (snapshot) => {
       if (!snapshot.exists()) {
         alert("ルームが見つかりませんでした");
-        router.push("/");
+        router.push(withName("/", userName));
         return;
       }
 
@@ -167,7 +175,7 @@ export default function RoomPage() {
       alert(
         `このテーマはホストにより終了されました。\nルーム指定画面に戻ります。\n\nルームID：${roomId}`
       );
-      router.push("/");
+      router.push(withName("/", userName));
     }
   }, [roomData?.status, router]);
 
@@ -509,7 +517,7 @@ export default function RoomPage() {
 
         {/* 戻る */}
         <button
-          onClick={() => router.push("/")}
+          onClick={() => router.push(withName("/", userName))}
           className="
             inline-flex items-center gap-2
             rounded-xl border border-slate-300 bg-white
@@ -537,10 +545,22 @@ export default function RoomPage() {
             権限レベルを選択してください
           </h2>
 
-          {!isVoting && (
-            <div className="mt-2 mb-4 flex items-center justify-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-              <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
-              <span className="font-medium">投票は締め切られました</span>
+          {/* 状況メッセージ */}
+          {isVoting && selectedCard === null && (
+            <div className="mt-3 mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-center text-sm text-green-700 shadow-sm">
+              ● 投票を行ってください
+            </div>
+          )}
+
+          {isVoting && selectedCard !== null && (
+            <div className="mt-3 mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-700 shadow-sm">
+              ● 投票の締め切りまでお待ちください
+            </div>
+          )}
+
+          {isRevealed && (
+            <div className="mt-3 mb-6 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-center text-sm text-yellow-700 shadow-sm">
+              ● 投票は締め切られました
             </div>
           )}
 

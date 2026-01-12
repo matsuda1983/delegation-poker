@@ -75,3 +75,8 @@ export const PRESENCE_CONFIG = {
   OFFLINE_THRESHOLD_MS: 30000, // 30秒
 } as const;
 
+// GETパラメータにURLを追加する処理
+export const withName = (path: string, name: string) => {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}name=${encodeURIComponent(name)}`;
+};

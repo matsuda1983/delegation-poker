@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   generateRoomId,
   getOrCreateParticipantId,
   setHostId,
+  withName,
 } from "../src/lib/utils";
 import { db } from "../src/lib/firebase";
 import {
@@ -56,6 +57,8 @@ export default function Home() {
 
   type RoomOption = { id: string; topic: string; status?: string };
   const [roomOptions, setRoomOptions] = useState<RoomOption[]>([]);
+
+  const searchParams = useSearchParams();
 
   // 投票結果取得用
   const [isResultsOpen, setIsResultsOpen] = useState(false);
@@ -120,6 +123,13 @@ export default function Home() {
     if (rank === 3) return <span className="text-amber-700 text-lg">🥉</span>;
     return null;
   };
+
+  useEffect(() => {
+    const nameFromQuery = searchParams.get("name");
+    if (nameFromQuery) {
+      setUserName(nameFromQuery);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const q = query(collection(db, "rooms"), limit(100));
@@ -202,7 +212,8 @@ export default function Home() {
       });
 
       // 遷移
-      router.push(`/room/${newRoomId}?name=${encodeURIComponent(userName)}`);
+      // router.push(`/room/${newRoomId}?name=${encodeURIComponent(userName)}`);
+      router.push(withName(`/room/${newRoomId}`, userName));
     } catch (err) {
       console.error("[createRoom] error", err);
       setError("ルームの作成に失敗しました");
@@ -235,9 +246,8 @@ export default function Home() {
       }
 
       // ルームページに遷移
-      router.push(
-        `/room/${roomId.toUpperCase()}?name=${encodeURIComponent(userName)}`
-      );
+      router.push(withName(`/room/${roomId.toUpperCase()}`, userName));
+      // router.push(withName(`/room/${newRoomId}`, userName));
     } catch (err) {
       console.error("Error joining room:", err);
       setError("ルームへの参加に失敗しました");
