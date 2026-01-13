@@ -32,19 +32,22 @@ const withTimeout = <T,>(p: Promise<T>, ms: number, label: string) =>
   ]);
 
 // 結果データ抽出クエリ
-const q = query(collection(db, "vote_results"), orderBy("votedAt", "desc"));
+export const dynamic = "force-dynamic";
 
-const snap = await getDocs(q);
+// デプロイ時のビルドでアクセスされエラーになるため削除
+// const q = query(collection(db, "vote_results"), orderBy("votedAt", "desc"));
 
-snap.docs.map((d) => ({
-  id: d.id,
-  roomId: d.data().roomId,
-  topic: d.data().topic,
-  first: d.data().first,
-  second: d.data().second,
-  third: d.data().third,
-  votedAt: d.data().votedAt,
-}));
+// const snap = await getDocs(q);
+
+// snap.docs.map((d) => ({
+//   id: d.id,
+//   roomId: d.data().roomId,
+//   topic: d.data().topic,
+//   first: d.data().first,
+//   second: d.data().second,
+//   third: d.data().third,
+//   votedAt: d.data().votedAt,
+// }));
 
 export default function Home() {
   const router = useRouter();
