@@ -1,4 +1,8 @@
-# Delegation Poker
+## プロダクト URL
+
+https://delegation-poker.vercel.app/
+
+## Delegation Poker
 
 チームで意思決定の「権限レベル」を合意形成するための
 リアルタイム投票アプリです。
